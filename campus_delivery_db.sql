@@ -448,8 +448,12 @@ INSERT INTO dishes (merchant_id, dish_name, price, stock, status) VALUES
 (3, '冰鲜柠檬水(超大杯)', 4.00, 200, 1);
 
 INSERT INTO pickup_points (point_name, location, capacity, current_packages) VALUES
-('1期智能寄存柜', '1期5栋与6栋之间车棚旁', 120, 0),
-('2期生活区中转驿站', '2期12栋宿管值班室对面', 200, 0);
+('1期智能寄存柜', '1期5栋与6栋之间车棚旁', 80, 0),
+('2期智能寄存柜', '2期12栋宿管值班室对面', 80, 0),
+('3期智能寄存柜', '3期8栋楼下大厅', 80, 0),
+('4期智能寄存柜', '4期2栋架空层', 80, 0),
+('5期智能寄存柜', '5期生活广场东侧', 100, 0),
+('6期智能寄存柜', '6期食堂旁', 50, 0);
 
 INSERT INTO riders (rider_name, phone, rider_type, status) VALUES
 ('赵铁柱', '15599991111', 'Stage1_Trunk', 'Idle'),

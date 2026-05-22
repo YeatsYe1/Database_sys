@@ -172,14 +172,24 @@ def generate_orders(conn, num_orders=1000):
         cursor.execute("SELECT merchant_id FROM merchants")
         merchant_ids = [row["merchant_id"] for row in cursor.fetchall()]
 
-        cursor.execute("SELECT point_id FROM pickup_points")
-        point_ids = [row["point_id"] for row in cursor.fetchall()]
+        cursor.execute("SELECT point_id, point_name FROM pickup_points")
+        points_data = cursor.fetchall()
+        point_ids = [row["point_id"] for row in points_data]
 
         cursor.execute("SELECT dish_id, merchant_id, price FROM dishes")
         dishes_data = cursor.fetchall()
 
         cursor.execute("SELECT rider_id, rider_type FROM riders")
         riders_data = cursor.fetchall()
+
+    # 找出"3期智能寄存柜"的 ID（用来制造爆仓危机）
+    overload_point_id = None
+    for p in points_data:
+        if "3期" in p["point_name"]:
+            overload_point_id = p["point_id"]
+            break
+    if overload_point_id is None:
+        overload_point_id = point_ids[0]  # fallback
 
     # 拆分骑手
     trunk_riders = [r["rider_id"] for r in riders_data if r["rider_type"] == "Stage1_Trunk"]
@@ -201,6 +211,14 @@ def generate_orders(conn, num_orders=1000):
     ]
     status_list = [s for s, w in status_weights for _ in range(w)]
 
+    # ===== 爆仓策略：强制塞满 3期智能寄存柜 =====
+    # capacity=80, 需要 >64 个 Arrived_At_Point 才能超过 80%
+    # 我们塞 68 个订单到 3期，状态全设为 Arrived_At_Point (68/80=85%)
+    OVERLOAD_COUNT = 68
+    overload_order_ids = []  # 记录这些订单的 order_id，方便后续追溯
+    overload_done = 0
+    print(f"\n   💥 爆仓策略：正在向 '3期智能寄存柜' 注入 {OVERLOAD_COUNT} 个滞留包裹……")
+
     order_insert_sql = """INSERT INTO orders
         (user_id, merchant_id, pickup_point_id, total_amount, order_status,
          stage1_rider_id, stage2_rider_id,
@@ -218,10 +236,14 @@ def generate_orders(conn, num_orders=1000):
             # ---- 随机选择基础关联 ----
             user_id = random.choice(user_ids)
             merchant_id = random.choice(merchant_ids)
-            point_id = random.choice(point_ids)
 
-            # ---- 随机确定订单状态 ----
-            order_status = random.choice(status_list)
+            # ===== 爆仓策略：前 OVERLOAD_COUNT 条订单强制塞入 3期智能寄存柜 =====
+            if order_index < OVERLOAD_COUNT:
+                point_id = overload_point_id
+                order_status = "Arrived_At_Point"
+            else:
+                point_id = random.choice(point_ids)
+                order_status = random.choice(status_list)
 
             # ---- 构造时间线（下单时间在过去30天内） ----
             created_at = now - timedelta(
@@ -277,6 +299,46 @@ def generate_orders(conn, num_orders=1000):
                 print(f"   📊 进度: {progress}/{num_orders} 条订单已生成 ({progress*100/num_orders:.0f}%)")
 
     print(f"✅ 成功插入 {num_orders} 条订单及对应明细！")
+    return overload_point_id
+
+
+# ------------------------------------------------------------------
+# 步骤 5：同步寄存点包裹计数（让大屏正确显示饱和度）
+# ------------------------------------------------------------------
+def sync_pickup_packages(conn, overload_point_id):
+    """
+    根据 orders 表中 Arrived_At_Point 状态的订单数，
+    更新 pickup_points 表的 current_packages 字段。
+    """
+    print(f"\n[步骤 5] 正在同步寄存点包裹计数……")
+    with conn.cursor() as cursor:
+        # 先统计每个寄存点中有多少 Arrived_At_Point 状态的订单
+        cursor.execute("""
+            SELECT pp.point_id, pp.capacity, COUNT(o.pickup_point_id) AS cnt
+            FROM pickup_points pp
+            LEFT JOIN orders o ON pp.point_id = o.pickup_point_id AND o.order_status = 'Arrived_At_Point'
+            GROUP BY pp.point_id, pp.capacity
+        """)
+        stats = cursor.fetchall()
+        for row in stats:
+            pid = row["point_id"]
+            cap = row["capacity"]
+            cnt = min(row["cnt"], cap)  # 不能超过容量（防 check constraint 冲突）
+            cursor.execute(
+                "UPDATE pickup_points SET current_packages = %s WHERE point_id = %s",
+                (cnt, pid)
+            )
+        conn.commit()
+        print(f"   已更新 {len(stats)} 个寄存点的包裹计数！")
+        # 打印爆仓点的最终饱和度
+        for row in stats:
+            if row["point_id"] == overload_point_id:
+                real_cnt = min(row["cnt"], row["capacity"])
+                pct = real_cnt / row["capacity"] * 100
+                print(f"   [爆仓] 3期智能寄存柜: {real_cnt}/{row['capacity']} = {pct:.1f}% ")
+                if pct > 80:
+                    print(f"   [成功] 饱和度超过80%! 大屏将显示红色爆仓警告!")
+                break
 
 
 # ------------------------------------------------------------------
@@ -303,7 +365,10 @@ def main():
         generate_dishes(conn, 5)
 
         # 步骤 4：1000条订单流水
-        generate_orders(conn, 1000)
+        overload_point_id = generate_orders(conn, 1000)
+
+        # 步骤 5：同步寄存点包裹计数（确保大屏正确显示饱和度）
+        sync_pickup_packages(conn, overload_point_id)
 
         elapsed = time.time() - start_time
         print("\n" + "=" * 60)

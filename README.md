@@ -1,167 +1,255 @@
-# 🚀 校园外卖两段式配送数据库系统
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.8%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Streamlit-1.28%2B-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit">
+  <img src="https://img.shields.io/badge/MySQL-8.0%2B-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL">
+  <img src="https://img.shields.io/badge/DeepSeek-Text--to--SQL-4F46E5?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" alt="DeepSeek AI">
+  <img src="https://img.shields.io/badge/Matplotlib-3.5%2B-11557C?style=for-the-badge&logo=plotly&logoColor=white" alt="Matplotlib">
+  <img src="https://img.shields.io/badge/Seaborn-0.12%2B-7C6B8E?style=for-the-badge&logo=python&logoColor=white" alt="Seaborn">
+  <img src="https://img.shields.io/badge/Status-Defense%20Passed-22C55E?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Status">
+</p>
 
-> **Campus Delivery Two-Stage Distribution Database System**  
-> 期末答辩展示项目 · 基于 MySQL + Streamlit 的全栈数据可视化大屏
+<h1 align="center">校园外卖两段式配送数据库系统</h1>
+
+<p align="center">
+  <strong>Campus Delivery Two-Stage Distribution Database System</strong><br>
+  Final Defense Project · Full-Stack Data Visualization Dashboard based on MySQL + Streamlit + DeepSeek AI
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/last-commit/your-repo/campus_delivery_project?style=flat-square&color=4F46E5" alt="Last Commit">
+  <img src="https://img.shields.io/github/repo-size/your-repo/campus_delivery_project?style=flat-square&color=06B6D4" alt="Repo Size">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome">
+</p>
 
 ---
 
-## 📋 项目概述
+## Project Overview
 
-本项目设计并实现了一套 **校园外卖两段式配送数据库系统**，包含：
+This project designs and implements a **Campus Delivery Two-Stage Distribution Database System**, integrating database engineering, real-time data visualization, and AI-powered natural language query capabilities:
 
-- **创新的两段式配送模式**：干线骑手（商家→寄存点）+ 楼栋骑手（寄存点→寝室）
-- **高并发防超卖机制**：利用 MySQL 行级锁 + 触发器实现高并发库存安全扣减
-- **全链路状态机**：6 种精细化订单状态流转，双骑手复合追踪
-- **实时数据大屏**：基于 Streamlit 打造精美的可视化监控看板
+| Core Feature | Description |
+|-------------|-------------|
+| **Two-Stage Delivery Model** | Trunk riders (merchant to pickup point) + Floor riders (pickup point to dormitory), solving the "last 500 meters" challenge in campus food delivery |
+| **High-Concurrency Anti-Overselling** | MySQL row-level locking (`SELECT ... FOR UPDATE`) combined with triggers for safe inventory deduction under high concurrency |
+| **Full-Lifecycle State Machine** | 6 fine-grained order status transitions with dual-rider composite tracking and full-process visualization |
+| **Real-Time Data Dashboard** | Streamlit-based visualization dashboard with 5 tabs covering all operational dimensions |
+| **AI-Powered Natural Language Query** | DeepSeek Text-to-SQL inference engine: input Chinese questions, automatically generate SQL queries and return result tables |
 
 ---
 
-## 🏗️ 项目结构
+## Project Structure
 
 ```
 campus_delivery_project/
-├── campus_delivery_db.sql      # 数据库完整建表脚本（DDL + 存储过程 + 视图 + 种子数据）
-├── dashboard_app.py            # Streamlit 数据可视化大屏
-├── generate_mock_data.py       # 模拟数据生成器（Faker）
-├── requirements.txt            # Python 依赖清单
-├── .env.example                # 环境变量配置模板
-├── .gitignore                  # Git 忽略规则
-└── README.md                   # 项目说明文档（你在这里 📖）
+├── campus_delivery_db.sql      # Complete database schema (DDL + stored procedures + views + seed data)
+├── dashboard_app.py            # Streamlit data visualization dashboard (with AI assistant)
+├── generate_mock_data.py       # Mock data generator (Faker)
+├── requirements.txt            # Python dependency list
+├── .env.example                # Environment variable configuration template
+├── .env                        # Local environment variables (in .gitignore, never committed)
+├── .gitignore                  # Git ignore rules
+└── README.md                   # Project documentation (you are here)
 ```
 
 ---
 
-## ⚙️ 快速开始
+## Quick Start
 
-### 前置条件
+### Prerequisites
 
 - Python 3.8+
-- MySQL 8.0+（支持 Window Function 和 SIGNAL 语法）
-- Git（可选，用于版本管理）
+- MySQL 8.0+ (with Window Function and SIGNAL syntax support)
+- Git (optional, for version control)
+- DeepSeek API Key (optional, for AI assistant, [free access](https://platform.deepseek.com/))
 
-### 1️⃣ 克隆 / 下载项目
+### Step 1: Clone / Download
 
 ```bash
-git clone <仓库地址>
+git clone <repository-url>
 cd campus_delivery_project
 ```
 
-### 2️⃣ 配置数据库
+### Step 2: Configure Database
 
-登录 MySQL 后执行建表脚本：
+Execute the schema script in MySQL:
 
 ```bash
 mysql -u root -p < campus_delivery_db.sql
 ```
 
-该脚本会自动：
-- 创建数据库 `campus_delivery_db`
-- 创建所有表、索引、视图、触发器、存储过程
-- 插入预置种子数据
+This script will automatically:
+- Create the database `campus_delivery_db`
+- Create all tables, indexes, views, triggers, and stored procedures
+- Insert preset seed data
 
-### 3️⃣ 配置环境变量
+### Step 3: Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，填入你的 MySQL 密码：
+Edit the `.env` file with your configuration:
 
 ```ini
+# MySQL Database Configuration
 MYSQL_HOST=localhost
 MYSQL_USER=root
-MYSQL_PASSWORD=你的数据库密码
+MYSQL_PASSWORD=your_database_password
 MYSQL_DATABASE=campus_delivery_db
 MYSQL_CHARSET=utf8mb4
+
+# DeepSeek AI Configuration (optional)
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
-### 4️⃣ 安装 Python 依赖
+> **Security Notice**: The `.env` file is listed in `.gitignore`. Do not commit it to the Git repository.
+
+### Step 4: Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-> 💡 建议使用虚拟环境：`python -m venv venv` 后激活再安装。
+> It is recommended to use a virtual environment: `python -m venv venv`
 
-### 5️⃣ 生成模拟数据（可选）
+### Step 5: Generate Mock Data (Optional)
 
 ```bash
 python generate_mock_data.py
 ```
 
-这将生成：
-- 👤 50 个学生用户
-- 🏪 15 个商家（各 5 道菜品）
-- 📦 1000 条历史订单流水
+This will generate:
+- **50** student users
+- **15** merchants (5 dishes each)
+- **1000** historical order records
 
-### 6️⃣ 启动数据大屏
+### Step 6: Launch the Dashboard
 
 ```bash
 streamlit run dashboard_app.py
 ```
 
-浏览器会自动打开，查看校园外卖实时数据监控大屏 🎉
+The browser will open automatically. Visit **http://localhost:8501** to view the real-time data monitoring dashboard.
 
 ---
 
-## 🗄️ 数据库核心设计
+## Database Core Design
 
-### 两段式状态机
+### Entity-Relationship Diagram
+
+> **Note**: Place the E-R diagram file `er_diagram.png` in the `images/` directory. It is recommended to export using MySQL Workbench or dbdiagram.io.
+
+<p align="center">
+  <img src="images/er_diagram.png" alt="E-R Diagram" width="80%" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+  <br>
+  <em>Placeholder — Please export your E-R diagram as <code>images/er_diagram.png</code> to replace this placeholder</em>
+</p>
+
+### Two-Stage State Machine
 
 ```
-Paid ──► Stage1_Assigned ──► Arrived_At_Point ──► Stage2_Assigned ──► Completed
-  │                              │                        │
-  └──────────── Cancelled ◄──────┴────────────────────────┘
+Paid ---> Stage1_Assigned ---> Arrived_At_Point ---> Stage2_Assigned ---> Completed
+  |                              |                        |
+  +------------ Cancelled <------+------------------------+
 ```
 
-### 核心表结构
+| Status | Meaning | Description |
+|--------|---------|-------------|
+| `Paid` | Payment Completed | Student placed and paid for the order |
+| `Stage1_Assigned` | Trunk Delivery | Trunk rider picks up from merchant and delivers to pickup point |
+| `Arrived_At_Point` | Arrived at Pickup Point | Food arrives at the transfer point, awaiting floor rider |
+| `Stage2_Assigned` | Floor Delivery | Floor rider picks up from point and delivers to dormitory |
+| `Completed` | Completed | Student successfully received the order |
+| `Cancelled` | Cancelled | Order cancelled at any stage |
 
-| 表名 | 说明 |
-|------|------|
-| `users` | 学生用户表（含校园卡余额） |
-| `merchants` | 商家信息表 |
-| `dishes` | 菜品表（含库存/上架状态） |
-| `pickup_points` | 寄存中转点（容量管控） |
-| `riders` | 两段式骑手表（干线/楼栋） |
-| `orders` | 订单主表（状态机 + 双骑手追踪） |
-| `order_items` | 订单明细表 |
+### Core Table Structure
 
-### 高并发安全机制
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `users` | Student users | `balance` (campus card), `dorm_building` |
+| `merchants` | Merchant information | `rating`, `address` |
+| `dishes` | Menu items | `stock` (real-time inventory), `status` (listing status) |
+| `pickup_points` | Pickup transfer points | `capacity` (max slots), `current_packages` (current occupancy) |
+| `riders` | Two-stage riders | `rider_type` (trunk/floor), `status` (working status) |
+| `orders` | Order master table (core) | `order_status` (state machine), dual-rider ID tracking |
+| `order_items` | Order line items | `quantity`, `price_at_order` (price snapshot) |
 
-- **防超卖触发器**：`trg_check_dish_stock_before_order` 在插入明细前使用 `SELECT ... FOR UPDATE` 加行锁检查库存
-- **自动扣库存触发器**：`trg_reduce_dish_stock_after_order` 下单成功后自动扣减
-- **事务保障**：所有存储过程均包含完整的事务回滚机制
+### High-Concurrency Safety Mechanisms
 
----
-
-## 📊 大屏功能
-
-| Tab | 功能 |
-|-----|------|
-| 📊 寄存柜饱和度预警 | 寄存点容量使用率 + 爆仓警戒线 |
-| 🏆 商户销售排行榜 | Top 10 商户销售额排行 |
-| 🛵 两段式运力监控 | 订单状态分布饼图 + 运力健康度 |
-| 📋 近期订单流水 | 最新 10 条订单详情 |
+- **Anti-Overselling Trigger**: `trg_check_dish_stock_before_order` uses `SELECT ... FOR UPDATE` for row-level locking before inserting order items
+- **Auto Stock Deduction Trigger**: `trg_reduce_dish_stock_after_order` automatically deducts inventory upon successful order placement
+- **Transaction Protection**: All stored procedures include complete transaction rollback mechanisms
 
 ---
 
-## 👥 参与贡献
+## Dashboard Features
 
-1. Fork 本项目
-2. 创建你的特性分支：`git checkout -b feature/amazing-feature`
-3. 提交你的改动：`git commit -m 'Add amazing feature'`
-4. 推送到分支：`git push origin feature/amazing-feature`
-5. 发起 Pull Request
+| Tab | Functionality | Technical Implementation |
+|-----|--------------|------------------------|
+| **Pickup Point Saturation** | Capacity usage bar chart with overflow thresholds and status cards | Matplotlib with conditional coloring |
+| **Merchant Sales Ranking** | Top 10 horizontal bar chart with data table | Seaborn gradient palette + Pandas |
+| **Two-Stage Capacity Monitoring** | Order status distribution donut chart with health progress bars | Matplotlib donut chart + custom CSS |
+| **Recent Order Flow** | Latest 10 order details table with colored status labels | Custom HTML table rendering |
+| **AI-Powered Data Assistant** | Input Chinese questions, AI generates SQL and returns results | DeepSeek Text-to-SQL inference engine |
+
+### AI-Powered Data Assistant -- Core Features
+
+> **Query data in natural language -- no SQL knowledge required.**
+
+- **Natural Language to SQL**: Integrates DeepSeek Chat model to automatically convert Chinese questions into MySQL queries
+- **Schema-Aware Intelligence**: AI is pre-loaded with complete database schema information, understanding field semantics and relationships
+- **Safety Interception**: Only SELECT queries are permitted; INSERT/UPDATE/DELETE operations are automatically blocked
+- **Conversational Interaction**: Supports multi-turn dialogue history with one-click example questions
+- **Result Visualization**: Query results displayed as Pandas DataFrames alongside the generated SQL statements
+
+**Example Questions:**
+- "Which merchant has the highest sales revenue?"
+- "How many students are registered in total?"
+- "What is the saturation level of each pickup point?"
+- "Which dormitory building has the most orders?"
 
 ---
 
-## 📄 许可证
+## Technology Stack
 
-本项目仅供学习交流使用。
+| Technology | Purpose |
+|------------|---------|
+| **Python 3.8+** | Backend logic and data processing |
+| **Streamlit** | Real-time data visualization dashboard framework |
+| **MySQL 8.0+** | Relational database (Window Functions, triggers, stored procedures) |
+| **DeepSeek Chat** | AI Text-to-SQL inference engine |
+| **Pandas** | Data cleaning and analysis |
+| **Matplotlib + Seaborn** | Chart visualization |
+| **PyMySQL** | Python MySQL database driver |
+| **Faker** | Mock data generation |
+| **python-dotenv** | Environment variable security management |
+
+---
+
+## Contributing
+
+1. Fork this repository
+2. Create your feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is for educational purposes only.
 
 ---
 
 <p align="center">
-  🏫 校园外卖两段式配送数据库系统 · 期末答辩展示<br>
-  Made with ❤️
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=100&section=footer"/>
+</p>
+
+<p align="center">
+  Campus Delivery Two-Stage Distribution Database System · Final Defense Project<br>
+  Powered by Streamlit & MySQL & DeepSeek AI
 </p>
