@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import seaborn as sns
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import json
 import traceback
@@ -240,6 +240,41 @@ def get_connection():
     return pymysql.connect(**DB_CONFIG)
 
 
+def _build_date_filter():
+    """根据 session 中选中的时间范围生成 SQL 条件"""
+    option = st.session_state.get("date_filter_opt", "全部数据")
+    today_sql = "DATE(o.created_at) = CURDATE()"
+    week_sql = "o.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    month_sql = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    month_cal = "DATE_FORMAT(o.created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
+    mapping = {
+        "今天": (" AND " + today_sql, " AND " + today_sql),
+        "最近 7 天": (" AND " + week_sql, " AND " + week_sql),
+        "最近 30 天": (" AND " + month_sql, " AND " + month_sql),
+        "本月": (" AND " + month_cal, " AND " + month_cal),
+        "全部数据": ("", ""),
+    }
+    return mapping.get(option, ("", ""))
+
+
+def _build_date_filter_generic(table_alias="o"):
+    """根据 session 中选中的时间范围生成通用 SQL 条件，可指定表别名"""
+    option = st.session_state.get("date_filter_opt", "全部数据")
+    col = f"{table_alias}.created_at"
+    today_sql = f"DATE({col}) = CURDATE()"
+    week_sql = f"{col} >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+    month_sql = f"{col} >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    month_cal = f"DATE_FORMAT({col}, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
+    mapping = {
+        "今天": " AND " + today_sql,
+        "最近 7 天": " AND " + week_sql,
+        "最近 30 天": " AND " + month_sql,
+        "本月": " AND " + month_cal,
+        "全部数据": "",
+    }
+    return mapping.get(option, "")
+
+
 @st.cache_data(ttl=60)
 def load_pickup_analytics():
     """读取寄存点饱和度分析"""
@@ -294,10 +329,12 @@ def load_order_status_distribution():
     """读取订单状态分布"""
     conn = get_connection()
     try:
-        query = """
-            SELECT order_status, COUNT(*) AS order_count
-            FROM orders
-            GROUP BY order_status
+        date_filter = _build_date_filter_generic("o")
+        query = f"""
+            SELECT o.order_status, COUNT(*) AS order_count
+            FROM orders o
+            WHERE 1=1 {date_filter}
+            GROUP BY o.order_status
             ORDER BY order_count DESC
         """
         with conn.cursor() as cursor:
@@ -314,20 +351,23 @@ def load_basic_stats():
     """读取基本统计指标"""
     conn = get_connection()
     try:
+        date_filter_orders = _build_date_filter_generic("o")
         stats = {}
         with conn.cursor() as cursor:
             cursor.execute("SELECT COUNT(*) FROM users")
             stats["total_users"] = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM merchants")
             stats["total_merchants"] = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM orders")
+            cursor.execute(f"SELECT COUNT(*) FROM orders o WHERE 1=1 {date_filter_orders}")
             stats["total_orders"] = cursor.fetchone()[0]
-            cursor.execute("SELECT IFNULL(SUM(total_amount), 0) FROM orders WHERE order_status = 'Completed'")
+            cursor.execute(f"""
+                SELECT IFNULL(SUM(o.total_amount), 0) 
+                FROM orders o 
+                WHERE o.order_status = 'Completed' {date_filter_orders}
+            """)
             stats["total_revenue"] = cursor.fetchone()[0]
-            # 在途骑手：正在配送中的骑手数量
             cursor.execute("SELECT COUNT(*) FROM riders WHERE status = 'Delivering'")
             stats["active_riders"] = cursor.fetchone()[0]
-            # 今日订单数
             cursor.execute("""
                 SELECT COUNT(*) FROM orders 
                 WHERE DATE(created_at) = CURDATE()
@@ -343,6 +383,7 @@ def load_recent_orders(limit=10):
     """读取最近订单"""
     conn = get_connection()
     try:
+        date_filter = _build_date_filter_generic("o")
         query = f"""
             SELECT 
                 o.order_id AS '订单号',
@@ -354,8 +395,42 @@ def load_recent_orders(limit=10):
             FROM orders o
             JOIN users u ON o.user_id = u.user_id
             JOIN merchants m ON o.merchant_id = m.merchant_id
+            WHERE 1=1 {date_filter}
             ORDER BY o.created_at DESC
             LIMIT {limit}
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=60)
+def load_time_period_distribution():
+    """读取时段订单分布（早餐/午餐高峰/下午/晚餐高峰/夜宵）"""
+    conn = get_connection()
+    try:
+        date_filter = _build_date_filter_generic("o")
+        query = f"""
+            SELECT
+                CASE
+                    WHEN HOUR(o.created_at) BETWEEN 6 AND 8 THEN '06-09 早餐'
+                    WHEN HOUR(o.created_at) BETWEEN 9 AND 10 THEN '09-11 上午'
+                    WHEN HOUR(o.created_at) BETWEEN 11 AND 13 THEN '11-13 午餐高峰'
+                    WHEN HOUR(o.created_at) BETWEEN 14 AND 16 THEN '14-17 下午'
+                    WHEN HOUR(o.created_at) BETWEEN 17 AND 19 THEN '17-19 晚餐高峰'
+                    WHEN HOUR(o.created_at) BETWEEN 20 AND 22 THEN '20-22 夜宵'
+                    ELSE '其他时段'
+                END AS time_period,
+                COUNT(*) AS order_count,
+                ROUND(AVG(o.total_amount), 2) AS avg_amount
+            FROM orders o
+            WHERE 1=1 {date_filter}
+            GROUP BY time_period
+            ORDER BY MIN(HOUR(o.created_at))
         """
         with conn.cursor() as cursor:
             cursor.execute(query)
@@ -671,6 +746,28 @@ def render_order_status_pie(df_status):
     plt.close()
 
 
+def render_time_period_chart(df_period):
+    """渲染时段订单分布柱状图"""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    fig.patch.set_facecolor('none')
+    ax.set_facecolor('none')
+    colors_period = ['#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6', '#EF4444', '#06B6D4', '#94A3B8']
+    bars = ax.bar(df_period['time_period'], df_period['order_count'],
+                  color=colors_period[:len(df_period)], width=0.55,
+                  edgecolor='white', linewidth=2, zorder=3)
+    for bar, (_, row) in zip(bars, df_period.iterrows()):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                f'{int(row["order_count"])}', ha='center', va='bottom',
+                fontsize=11, fontweight='bold', color='#1E293B',
+                fontproperties=FONT_PROP)
+    ax.set_xticks(range(len(df_period)))
+    ax.set_xticklabels(df_period['time_period'], fontproperties=FONT_PROP, rotation=15)
+    style_axis(ax)
+    ax.set_ylabel('订单量', fontsize=10, color='#64748B', fontproperties=FONT_PROP)
+    st.pyplot(fig, width='stretch')
+    plt.close()
+
+
 def render_recent_orders_table(df_recent):
     """渲染近期订单流水表格"""
     def style_status(s):
@@ -711,6 +808,20 @@ def render_recent_orders_table(df_recent):
 # ================================================================
 
 def main():
+    # ---- 侧边栏：时间范围过滤器 ----
+    with st.sidebar:
+        st.markdown("### 筛选条件")
+        date_options = ["今天", "最近 7 天", "最近 30 天", "本月", "全部数据"]
+        selected_date = st.selectbox(
+            "时间范围",
+            date_options,
+            index=date_options.index(st.session_state.get("date_filter_opt", "全部数据")),
+            key="date_filter_opt",
+        )
+        st.markdown("---")
+        st.caption("校园外卖两段式配送数据库系统")
+        st.caption(f"数据更新时间: {datetime.now().strftime('%m-%d %H:%M')}")
+
     # ---- 数据库连接检测 ----
     try:
         stats = load_basic_stats()
@@ -721,10 +832,11 @@ def main():
 
     # ==================== 头部标题 ====================
     now = datetime.now()
+    time_label = st.session_state.get("date_filter_opt", "全部数据")
     st.markdown(f"""
     <div class="header-container">
         <div class="header-title">校园外卖两段式配送 · 实时数据监控大屏</div>
-        <div class="header-sub">{now.year}-{now.month:02d}-{now.day:02d} {now:%H:%M:%S} UTC+8 · 数据来源: campus_delivery_db</div>
+        <div class="header-sub">{now.year}-{now.month:02d}-{now.day:02d} {now:%H:%M:%S} UTC+8 · 数据来源: campus_delivery_db · 筛选: {time_label}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -732,6 +844,32 @@ def main():
     render_kpi_row(stats)
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==================== 新增行：时段订单分布（全宽） ====================
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">时段订单分布（高峰分析）</div>', unsafe_allow_html=True)
+    try:
+        df_period = load_time_period_distribution()
+        if df_period.empty:
+            st.info("暂无订单数据。")
+        else:
+            render_time_period_chart(df_period)
+            # 显示高峰 vs 非高峰对比摘要
+            peak_mask = df_period['time_period'].str.contains('高峰|夜宵')
+            peak_orders = int(df_period[peak_mask]['order_count'].sum())
+            total_orders = int(df_period['order_count'].sum())
+            peak_pct = round(peak_orders / total_orders * 100, 1) if total_orders > 0 else 0
+            st.markdown(
+                f'<div style="text-align:center;color:#64748B;font-size:0.85rem;padding:0.5rem;">'
+                f'高峰+夜宵时段订单占比: <strong style="color:#EF4444;font-size:1rem;">{peak_pct}%</strong> '
+                f'（{peak_orders} / {total_orders} 单）'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+    except Exception as e:
+        st.error("加载时段分布数据失败")
+        st.code(traceback.format_exc())
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ==================== 宽屏网格布局 ====================
     # 第一行：左（商户排行）+ 右（运力饼图）
@@ -892,7 +1030,40 @@ def main():
                 # 显示结果表格
                 if msg.get("result") and len(msg["result"]) > 0:
                     df_result = pd.DataFrame(msg["result"])
+
+                    # 表格展示
                     st.dataframe(df_result, width='stretch', hide_index=True)
+
+                    # 自动图表：如果有数值列且行数>1，自动生成柱状图
+                    num_cols = df_result.select_dtypes(include=['float64', 'int64']).columns.tolist()
+                    if len(num_cols) >= 1 and len(df_result) > 1:
+                        with st.expander("查看图表"):
+                            chart_tab1, chart_tab2 = st.columns(2)
+                            with chart_tab1:
+                                st.caption("柱状图（第一列数值）")
+                                try:
+                                    first_text_col = df_result.select_dtypes(exclude=['float64', 'int64']).columns[0]
+                                    st.bar_chart(df_result.set_index(first_text_col)[num_cols[0]], width='stretch')
+                                except Exception:
+                                    pass
+                            with chart_tab2:
+                                if len(num_cols) > 1:
+                                    st.caption("折线图（前 3 列数值）")
+                                    try:
+                                        first_text_col = df_result.select_dtypes(exclude=['float64', 'int64']).columns[0]
+                                        st.line_chart(df_result.set_index(first_text_col)[num_cols[:3]], width='stretch')
+                                    except Exception:
+                                        pass
+
+                    # CSV 下载按钮
+                    csv_data = df_result.to_csv(index=False, encoding='utf-8-sig')
+                    st.download_button(
+                        label="下载 CSV",
+                        data=csv_data,
+                        file_name=f"ai_query_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
