@@ -157,10 +157,9 @@ FOR EACH ROW
 BEGIN
     DECLARE v_stock INT;
     DECLARE v_status TINYINT;
-    DECLARE v_dish_name VARCHAR(100);
     
     -- 获取该商品的当前最真实库存和上下架状态（加行锁防并发超卖）
-    SELECT stock, status, dish_name INTO v_stock, v_status, v_dish_name 
+    SELECT stock, status INTO v_stock, v_status
     FROM dishes WHERE dish_id = NEW.dish_id FOR UPDATE;
     
     -- 校验一：检查是否下架

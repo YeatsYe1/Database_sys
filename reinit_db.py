@@ -9,7 +9,7 @@ if sys.platform == "win32":
 
 import pymysql, os
 from dotenv import load_dotenv
-load_dotenv('.env')
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 PASSWORD = os.getenv("MYSQL_PASSWORD")
 HOST = os.getenv("MYSQL_HOST", "localhost")
@@ -118,8 +118,7 @@ FOR EACH ROW
 BEGIN
     DECLARE v_stock INT;
     DECLARE v_status TINYINT;
-    DECLARE v_dish_name VARCHAR(100);
-    SELECT stock, status, dish_name INTO v_stock, v_status, v_dish_name 
+    SELECT stock, status INTO v_stock, v_status
     FROM dishes WHERE dish_id = NEW.dish_id FOR UPDATE;
     IF v_status = 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '下单失败：您选购的商品已下架！';

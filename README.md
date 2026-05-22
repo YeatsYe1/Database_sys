@@ -46,7 +46,6 @@ campus_delivery_project/
 ├── generate_mock_data.py       # 模拟数据生成器（Faker, 100学生/20商家/5000订单）
 ├── check_data.py               # 数据检查脚本（快速验证各表数据量）
 ├── reinit_db.py                # Python 版数据库重建脚本
-├── create_views.sql            # 大屏视图定义（寄存点饱和度 + 商户销售排行）
 ├── requirements.txt            # Python 依赖列表
 ├── .env.example                # 环境变量配置模板
 ├── .gitignore                  # Git 忽略规则（.env 已加入忽略，永不提交）
@@ -247,10 +246,18 @@ erDiagram
 
 ### 两段式状态机
 
-```
-Paid ---> Stage1_Assigned ---> Arrived_At_Point ---> Stage2_Assigned ---> Completed
-  |                              |                        |
-  +------------ Cancelled <------+------------------------+
+```mermaid
+stateDiagram-v2
+    [*] --> Paid : 下单支付
+    Paid --> Stage1_Assigned : 干线骑手接单
+    Stage1_Assigned --> Arrived_At_Point : 送达寄存点
+    Arrived_At_Point --> Stage2_Assigned : 楼栋骑手接单
+    Stage2_Assigned --> Completed : 送达宿舍
+    Paid --> Cancelled : 用户取消
+    Stage1_Assigned --> Cancelled : 用户/系统取消
+    Arrived_At_Point --> Cancelled : 超时取消
+    Completed --> [*]
+    Cancelled --> [*]
 ```
 
 | 状态 | 含义 | 说明 |

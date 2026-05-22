@@ -136,7 +136,8 @@ DB_CONFIG = {
     "user": os.getenv("MYSQL_USER", "root"),
     "password": os.getenv("MYSQL_PASSWORD"),
     "database": os.getenv("MYSQL_DATABASE", "campus_delivery_db"),
-    "charset": "utf8mb4",          # 强制锁死 utf8mb4，杜绝中文乱码
+    "charset": os.getenv("MYSQL_CHARSET", "utf8mb4"),  # 从 .env 读取编码，默认 utf8mb4（不再硬编码锁死）
+
     "use_unicode": True,
     "init_command": "SET NAMES utf8mb4",
 }
@@ -411,18 +412,23 @@ def load_basic_stats(date_option="全部数据"):
                 WHERE o.order_status = 'Completed' {date_filter_orders}
             """)
             stats["total_revenue"] = cursor.fetchone()[0]
-            # 在运骑手：status=Delivering 或已分配订单未完成的骑手
+            # 在运骑手：骑手状态为 Delivering，或有关联的未完成订单
             cursor.execute("""
-                SELECT COUNT(DISTINCT r.rider_id) 
+                SELECT COUNT(DISTINCT r.rider_id)
                 FROM riders r
-                LEFT JOIN orders o ON (r.rider_id = o.stage1_rider_id OR r.rider_id = o.stage2_rider_id)
-                    AND o.order_status NOT IN ('Completed', 'Cancelled')
-                WHERE r.status = 'Delivering' OR o.order_id IS NOT NULL
+                WHERE r.status = 'Delivering'
+                   OR r.rider_id IN (
+                       SELECT stage1_rider_id FROM orders
+                       WHERE order_status NOT IN ('Completed', 'Cancelled') AND stage1_rider_id IS NOT NULL
+                       UNION
+                       SELECT stage2_rider_id FROM orders
+                       WHERE order_status NOT IN ('Completed', 'Cancelled') AND stage2_rider_id IS NOT NULL
+                   )
             """)
             stats["active_riders"] = cursor.fetchone()[0]
-            cursor.execute("""
-                SELECT COUNT(*) FROM orders 
-                WHERE DATE(created_at) = CURDATE()
+            cursor.execute(f"""
+                SELECT COUNT(*) FROM orders o 
+                WHERE DATE(o.created_at) = CURDATE() {date_filter_orders}
             """)
             stats["today_orders"] = cursor.fetchone()[0]
         return stats
@@ -713,12 +719,37 @@ def ai_text_to_sql(user_question: str) -> dict:
         sql = response.choices[0].message.content.strip()
         sql = sql.replace("```sql", "").replace("```", "").strip()
 
-        if not sql.upper().strip().startswith("SELECT"):
+        sql_upper = sql.upper().strip()
+        if not sql_upper.startswith("SELECT"):
             return {
                 "success": False,
                 "sql": sql,
                 "result": [],
                 "error": "AI 生成的不是查询语句，已拦截执行"
+            }
+
+        # 二次安全检查：拦截危险关键字（INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE/EXEC/SHUTDOWN）
+        dangerous_keywords = [
+            "INSERT ", "UPDATE ", "DELETE ", "DROP ", "ALTER ",
+            "TRUNCATE ", "CREATE ", "EXEC ", "SHUTDOWN", "INTO OUTFILE",
+            "INTO DUMPFILE", "LOAD DATA", "SET @", "@@",
+        ]
+        for kw in dangerous_keywords:
+            if kw in sql_upper:
+                return {
+                    "success": False,
+                    "sql": sql,
+                    "result": [],
+                    "error": f"检测到危险关键字 '{kw.strip()}'，已拦截执行"
+                }
+
+        # 检查是否含有分号（多语句注入防护）
+        if ";" in sql.rstrip(";"):
+            return {
+                "success": False,
+                "sql": sql,
+                "result": [],
+                "error": "检测到多条 SQL 语句（含分号），已拦截执行"
             }
 
         conn = get_connection()
@@ -884,7 +915,8 @@ def render_order_status_pie(df_status):
     centre_circle = plt.Circle((0, 0), 0.50, fc='white', alpha=0.8)
     ax.add_artist(centre_circle)
     ax.text(0, 0, f'{df_status["order_count"].sum()}\n总计',
-            ha='center', va='center', fontsize=12, fontweight='bold', color='#1E293B')
+            ha='center', va='center', fontsize=12, fontweight='bold', color='#1E293B',
+            fontproperties=FONT_PROP)
     st.pyplot(fig, width='stretch')
     plt.close()
 
@@ -914,6 +946,12 @@ def render_time_period_chart(df_period):
 
 def render_recent_orders_table(df_recent):
     """渲染近期订单流水表格"""
+    import html as _html
+
+    def _escape_html(val):
+        """转义 HTML 特殊字符，防止 XSS 或渲染错乱"""
+        return _html.escape(str(val))
+
     def style_status(s):
         color_map = {
             'Paid': ('已支付', '#F59E0B'),
@@ -924,7 +962,7 @@ def render_recent_orders_table(df_recent):
             'Cancelled': ('已取消', '#EF4444'),
         }
         label, color = color_map.get(s, (s, '#94A3B8'))
-        return f'<span style="background:{color}20;color:{color};padding:2px 12px;border-radius:20px;font-size:0.8rem;font-weight:500;">{label}</span>'
+        return f'<span style="background:{color}20;color:{color};padding:2px 12px;border-radius:20px;font-size:0.8rem;font-weight:500;">{_escape_html(label)}</span>'
 
     html = '<table style="width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">'
     html += '<tr style="background:#F8FAFC;">'

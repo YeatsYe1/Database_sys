@@ -130,13 +130,18 @@ def generate_merchants(conn, num=20):
              VALUES (%s, %s, %s, %s)"""
     data = []
     used_names = set()
+    used_phones = set()
     for _ in range(num):
         while True:
             name = f"{random.choice(prefix_list)}{random.choice(suffix_list)}"
             if name not in used_names:
                 used_names.add(name)
                 break
-        phone = f"1{random.choice(['38','39','55','77','88'])}{random.randint(10000000,99999999):08d}"[:11]
+        while True:
+            phone = f"1{random.choice(['38','39','55','77','88'])}{random.randint(10000000,99999999):08d}"[:11]
+            if phone not in used_phones:
+                used_phones.add(phone)
+                break
         addr = f"{random.choice(['丁香餐厅','玫瑰餐厅','紫荆餐厅','下沉广场','综合楼','学子餐厅'])}{random.choice(['一楼','二楼','三楼','负一楼','负二楼'])}{random.choice(['核心区','侧廊','尽头','入口处','天桥旁'])}"
         rating = round(random.uniform(3.5, 5.0), 1)
         data.append((name, phone, addr, rating))
@@ -293,11 +298,13 @@ def generate_orders(conn, num_orders=5000):
             stage1_completed_at = None
             stage2_completed_at = None
 
-            if order_status in ("Stage1_Assigned", "Arrived_At_Point", "Stage2_Assigned", "Completed"):
+            # ---- 根据订单状态设置时间戳 ----
+            # Stage1_Assigned: 干线还在配送中，stage1_completed_at 应为 NULL
+            # Arrived_At_Point: 干线已完成，stage1_completed_at 应设置
+            # Stage2_Assigned: 干线已完成，stage1_completed_at 应设置
+            # Completed: 两段都已完成
+            if order_status in ("Arrived_At_Point", "Stage2_Assigned", "Completed"):
                 stage1_completed_at = created_at + timedelta(minutes=random.randint(10, 40))
-
-            if order_status in ("Stage2_Assigned", "Completed"):
-                stage2_completed_at = stage1_completed_at + timedelta(minutes=random.randint(5, 25))
 
             if order_status == "Completed":
                 stage2_completed_at = stage1_completed_at + timedelta(minutes=random.randint(5, 25))
@@ -312,9 +319,26 @@ def generate_orders(conn, num_orders=5000):
             price_at_order = float(selected_dish["price"])
             total_amount = round(price_at_order * quantity, 2)
 
-            # ---- 骑手指派 ----
-            stage1_rider = random.choice(trunk_riders) if trunk_riders else None
-            stage2_rider = random.choice(floor_riders) if floor_riders else None
+            # ---- 根据订单状态骑手指派 ----
+            # Paid: 刚支付，尚未分配任何骑手
+            # Stage1_Assigned: 仅分配干线骑手（stage1），楼栋骑手（stage2）为 NULL
+            # Arrived_At_Point: 干线已完成，干线骑手已释放，等待楼栋骑手
+            # Stage2_Assigned: 已分配楼栋骑手（stage2），干线骑手已释放
+            # Completed: 两段都已完成，骑手均已释放
+            stage1_rider = None
+            stage2_rider = None
+            if order_status == "Stage1_Assigned":
+                stage1_rider = random.choice(trunk_riders) if trunk_riders else None
+            elif order_status == "Stage2_Assigned":
+                stage2_rider = random.choice(floor_riders) if floor_riders else None
+            elif order_status == "Arrived_At_Point":
+                # 爆仓订单：干线已完成但滞留寄存点，无骑手占用
+                pass
+            elif order_status == "Completed":
+                # 已完成订单：骑手均已释放
+                pass
+            # Paid 状态：两个骑手均为 NULL
+
 
             cursor.execute(order_insert_sql, (
                 user_id, merchant_id, point_id, total_amount, order_status,
