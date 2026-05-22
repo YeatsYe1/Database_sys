@@ -441,6 +441,80 @@ def load_time_period_distribution():
         conn.close()
 
 
+@st.cache_data(ttl=60)
+def load_merchant_info():
+    """读取商户信息列表"""
+    conn = get_connection()
+    try:
+        query = """
+            SELECT 
+                merchant_id AS '编号',
+                merchant_name AS '店铺名称',
+                phone AS '联系电话',
+                rating AS '评分',
+                DATE_FORMAT(created_at, '%%Y-%%m-%%d') AS '入驻时间'
+            FROM merchants
+            ORDER BY merchant_id
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=60)
+def load_student_info():
+    """读取学生用户信息列表"""
+    conn = get_connection()
+    try:
+        query = """
+            SELECT 
+                user_id AS '学号',
+                username AS '姓名',
+                phone AS '手机号',
+                dorm_building AS '宿舍楼栋',
+                balance AS '校园卡余额(元)',
+                DATE_FORMAT(created_at, '%%Y-%%m-%%d') AS '注册时间'
+            FROM users
+            ORDER BY user_id
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=60)
+def load_merchant_dishes():
+    """读取所有菜品信息"""
+    conn = get_connection()
+    try:
+        query = """
+            SELECT 
+                d.dish_id AS '菜品编号',
+                d.dish_name AS '菜品名称',
+                d.price AS '单价(元)',
+                d.stock AS '库存',
+                m.merchant_name AS '所属商家'
+            FROM dishes d
+            JOIN merchants m ON d.merchant_id = m.merchant_id
+            ORDER BY m.merchant_name, d.dish_id
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        conn.close()
+
+
 # ================================================================
 # AI 智能数据助手 — DeepSeek Text-to-SQL
 # ================================================================
@@ -933,6 +1007,52 @@ def main():
             st.error("加载近期订单数据失败")
             st.code(traceback.format_exc())
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # ==================== 商户信息 + 学生信息（两列） ====================
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_mer, col_stu = st.columns(2)
+
+    with col_mer:
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">商户信息一览</div>', unsafe_allow_html=True)
+        try:
+            df_mer_info = load_merchant_info()
+            if df_mer_info.empty:
+                st.info("暂无商户数据。")
+            else:
+                st.dataframe(df_mer_info, width='stretch', hide_index=True)
+        except Exception as e:
+            st.error("加载商户信息失败")
+            st.code(traceback.format_exc())
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_stu:
+        st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">学生用户信息一览</div>', unsafe_allow_html=True)
+        try:
+            df_stu = load_student_info()
+            if df_stu.empty:
+                st.info("暂无学生数据。")
+            else:
+                st.dataframe(df_stu, width='stretch', hide_index=True)
+        except Exception as e:
+            st.error("加载学生信息失败")
+            st.code(traceback.format_exc())
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ==================== 菜品信息（全宽） ====================
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">菜品信息一览</div>', unsafe_allow_html=True)
+    try:
+        df_dishes = load_merchant_dishes()
+        if df_dishes.empty:
+            st.info("暂无菜品数据。")
+        else:
+            st.dataframe(df_dishes, width='stretch', hide_index=True)
+    except Exception as e:
+        st.error("加载菜品信息失败")
+        st.code(traceback.format_exc())
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ==================== AI 智能数据助手（全宽） ====================
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
