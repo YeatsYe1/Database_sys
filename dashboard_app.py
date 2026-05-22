@@ -588,6 +588,65 @@ def load_merchant_dishes():
         conn.close()
 
 
+@st.cache_data(ttl=60)
+def load_rider_info():
+    """读取骑手信息列表"""
+    conn = get_connection()
+    try:
+        query = """
+            SELECT 
+                rider_id AS '编号',
+                rider_name AS '姓名',
+                phone AS '联系电话',
+                rider_type AS '分工',
+                status AS '状态'
+            FROM riders
+            ORDER BY rider_id
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            # 将英文状态映射为中文
+            type_map = {'Stage1_Trunk': '🚚 干线骑手', 'Stage2_Floor': '🏠 楼栋骑手'}
+            status_map = {'Idle': '🟢 空闲', 'Delivering': '🔴 配送中', 'Offline': '⚫ 离线'}
+            df['分工'] = df['分工'].map(type_map).fillna(df['分工'])
+            df['状态'] = df['状态'].map(status_map).fillna(df['状态'])
+        return df
+    finally:
+        conn.close()
+
+
+@st.cache_data(ttl=60)
+def load_pickup_point_info():
+    """读取寄存点信息列表"""
+    conn = get_connection()
+    try:
+        query = """
+            SELECT 
+                point_id AS '编号',
+                point_name AS '站点名称',
+                location AS '位置',
+                capacity AS '最大容量',
+                current_packages AS '当前在库'
+            FROM pickup_points
+            ORDER BY point_id
+        """
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        df = pd.DataFrame(rows, columns=columns)
+        if not df.empty:
+            df['饱和度'] = (df['当前在库'] / df['最大容量'] * 100).round(1).astype(str) + '%'
+        return df
+    finally:
+        conn.close()
+
+
+
 # ================================================================
 # AI 智能数据助手 — DeepSeek Text-to-SQL
 # ================================================================
@@ -1027,8 +1086,33 @@ def main():
                 st.code(traceback.format_exc())
 
         st.markdown("---")
+        st.markdown("### 🚴 骑手信息")
+        with st.expander("骑手信息一览", expanded=False):
+            try:
+                df_riders = load_rider_info()
+                if df_riders.empty:
+                    st.info("暂无骑手数据。")
+                else:
+                    st.dataframe(df_riders, width='stretch', hide_index=True)
+            except Exception as e:
+                st.error("加载骑手信息失败")
+                st.code(traceback.format_exc())
+
+        with st.expander("寄存站点信息一览", expanded=False):
+            try:
+                df_points_info = load_pickup_point_info()
+                if df_points_info.empty:
+                    st.info("暂无站点数据。")
+                else:
+                    st.dataframe(df_points_info, width='stretch', hide_index=True)
+            except Exception as e:
+                st.error("加载站点信息失败")
+                st.code(traceback.format_exc())
+
+        st.markdown("---")
         st.caption("校园外卖两段式配送数据库系统")
         st.caption(f"数据更新时间: {datetime.now().strftime('%m-%d %H:%M')}")
+
 
     # ==================== 顶部标题 ====================
     now = datetime.now()
