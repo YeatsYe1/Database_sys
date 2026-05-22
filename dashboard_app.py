@@ -595,7 +595,7 @@ def render_pickup_saturation_chart(df_points):
     style_axis(ax)
     ax.legend(fontsize=9, loc='upper right', framealpha=0.8, prop=FONT_PROP)
     ax.set_ylabel('饱和度 (%)', fontsize=10, color='#64748B', fontproperties=FONT_PROP)
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
     plt.close()
 
     # 爆仓预警：饱和度超过 80% 的寄存点
@@ -629,7 +629,7 @@ def render_merchant_rank_chart(df_merchants):
     style_axis(ax)
     ax.set_xlabel('总销售额 (\u00a5)', fontsize=10, color='#64748B', fontproperties=FONT_PROP)
     ax.margins(x=0.25)
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
     plt.close()
 
 
@@ -667,7 +667,7 @@ def render_order_status_pie(df_status):
     ax.add_artist(centre_circle)
     ax.text(0, 0, f'{df_status["order_count"].sum()}\n总计',
             ha='center', va='center', fontsize=12, fontweight='bold', color='#1E293B')
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width='stretch')
     plt.close()
 
 
@@ -828,7 +828,7 @@ def main():
         ]
         for i, (col, example) in enumerate(zip(example_cols, examples)):
             with col:
-                if st.button(example, key=f"ai_example_{i}", use_container_width=True):
+                if st.button(example, key=f"ai_example_{i}", width='stretch'):
                     st.session_state.ai_input = example
 
         # 用户输入
@@ -841,9 +841,9 @@ def main():
 
         col_submit, col_clear = st.columns([1, 5])
         with col_submit:
-            submit_clicked = st.button("发送", type="primary", use_container_width=True)
+            submit_clicked = st.button("发送", type="primary", width='stretch')
         with col_clear:
-            if st.button("清除记录", use_container_width=True):
+            if st.button("清除记录", width='stretch'):
                 st.session_state.ai_chat_history = []
                 st.rerun()
 
@@ -892,7 +892,7 @@ def main():
                 # 显示结果表格
                 if msg.get("result") and len(msg["result"]) > 0:
                     df_result = pd.DataFrame(msg["result"])
-                    st.dataframe(df_result, use_container_width=True, hide_index=True)
+                    st.dataframe(df_result, width='stretch', hide_index=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
