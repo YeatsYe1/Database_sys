@@ -14,7 +14,7 @@ import os
 from dotenv import load_dotenv
 
 # 使用绝对路径加载 .env 文件
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 def main():
     conn = None

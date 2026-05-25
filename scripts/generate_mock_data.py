@@ -28,7 +28,7 @@ from faker import Faker
 from dotenv import load_dotenv
 
 # 加载 .env 文件中的环境变量
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # ==================================================================
 # 数据库连接配置 — 从 .env 文件读取，防止密码泄露

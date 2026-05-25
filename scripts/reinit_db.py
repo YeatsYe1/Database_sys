@@ -9,7 +9,7 @@ if sys.platform == "win32":
 
 import pymysql, os
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 PASSWORD = os.getenv("MYSQL_PASSWORD")
 HOST = os.getenv("MYSQL_HOST", "localhost")
